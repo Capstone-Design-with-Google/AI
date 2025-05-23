@@ -1,0 +1,9 @@
+requests
+beautifulsoup4
+selenium
+Pillow
+google-generativeai
+google-cloud-texttospeech
+moviepy
+python-dotenv
+# webdriver-manager
