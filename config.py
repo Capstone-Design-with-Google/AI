@@ -19,14 +19,15 @@ SELENIUM_WAIT_TIMEOUT = 20
 IMAGE_DOWNLOAD_TIMEOUT = 15
 
 GEMINI_VISION_MODEL_NAME = 'gemini-1.5-flash' # OCR 및 이미지 추천에 사용
-GEMINI_TEXT_MODEL_NAME = 'gemini-1.0-pro'   # 나레이션 및 씬 스크립트 생성에 사용
+GEMINI_TEXT_MODEL_NAME = 'gemini-1.5-flash'   # 나레이션 및 씬 스크립트 생성에 사용
 
 TTS_LANGUAGE_CODE = "ko-KR"
 TTS_VOICE_NAME_NEURAL = "ko-KR-Neural2-B"
 
 VIDEO_FPS = 24
 VIDEO_RESOLUTION = (720, 1280)
-DEFAULT_FONT_PATH_WIN = "malgun.ttf"
+# DEFAULT_FONT_PATH_WIN = "malgun.ttf"
+DEFAULT_FONT_PATH_WIN = "NanumGothicBold.ttf"
 DEFAULT_FONT_PATH_MAC = "/Library/Fonts/AppleGothic.ttf"
 DEFAULT_FONT_PATH_LINUX = "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"
 
