@@ -63,7 +63,7 @@ def run_ai_shorts_generator(target_url):
 if __name__ == "__main__":
     # target_product_url = "https://prod.danawa.com/info/?pcode=41499608&cate=10253217"
     target_product_url = "https://commerceh.cafe24.com/product/%ED%85%8C%EC%98%A4%ED%91%B8%EB%93%9C-%EC%95%84%EB%A1%B1%EC%82%AC%ED%83%9C-%EC%8A%A4%EC%A7%80%EC%A0%84%EA%B3%A8/830/category/1/display/3/"
-    
+    # target_product_url = "https://commerceh.cafe24.com/product/%EB%82%AD%EB%A7%8C%ED%91%B8%EB%93%9C-%EC%88%AF%EB%B6%88%EC%96%91%EB%85%90%EC%B9%98%ED%82%A8-%EC%B9%98%EC%A6%88%EB%B6%88%EB%8B%AD-%EC%96%91%EB%85%90%EC%82%BC%EA%B2%B9%EB%B0%94%EB%B2%A0%ED%81%90/841/category/1/display/3/"
     # API 키 및 GCP 인증 파일 경로 확인 (config.py에서 수행되지만, 여기서 한 번 더 명시적으로 알림)
     if not config.GOOGLE_API_KEY_GEMINI:
         print("🚨 중요: Gemini API 키가 config.py 또는 .env 파일에 설정되지 않았습니다.")

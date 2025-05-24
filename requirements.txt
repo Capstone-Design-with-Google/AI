@@ -6,4 +6,5 @@ google-generativeai
 google-cloud-texttospeech
 moviepy
 python-dotenv
+numpy
 # webdriver-manager
