@@ -1,5 +1,5 @@
 import os
-import numpy as np # NumPy import 추가
+import numpy as np
 from moviepy.editor import (ImageClip, AudioFileClip, TextClip, CompositeVideoClip,
                             concatenate_videoclips, vfx)
 from PIL import Image, ImageOps
@@ -10,7 +10,6 @@ from config import (VIDEOS_FOLDER, IMAGES_RAW_FOLDER, DEFAULT_FONT_PATH_WIN,
 from utils.file_utils import ensure_folder_exists
 from core.scenario_generator import recommend_image_for_scene
 
-# (ImageMagick 경로 설정 및 get_system_font 함수는 이전과 동일하게 유지)
 # --- ImageMagick 경로 설정 (파일 상단에 위치) ---
 imagemagick_binary_path = r"C:\Program Files\ImageMagick-7.1.1-Q16-HDRI\magick.exe" 
 
@@ -89,7 +88,9 @@ def create_video_from_scenario(scenario_data_with_audio, product_name, downloade
             except Exception as e_placeholder:
                 print(f"플레이스홀더 이미지 생성 실패: {e_placeholder}.")
 
+
     total_video_duration_calculated = 0
+    used_image_filenames_in_video = [] # 이미 사용된 이미지 파일명 목록
 
     for scene_info in scenario_data_with_audio:
         scene_num = scene_info.get("scene_number", "N/A")
@@ -123,15 +124,17 @@ def create_video_from_scenario(scenario_data_with_audio, product_name, downloade
             scene_duration = 0.5
         
         total_video_duration_calculated += scene_duration
-
+        
         scene_image_description = scene_info.get("recommended_image_description", "")
+        
         selected_image_path = recommend_image_for_scene(
             scene_description=scene_image_description,
             scene_narration=narration,
             scene_subtitle=subtitle_text,
             available_image_paths=available_images,
             product_name=product_name,
-            scene_number=str(scene_num) 
+            scene_number=str(scene_num),
+            previously_used_filenames=used_image_filenames_in_video 
         )
 
         if not selected_image_path or not os.path.exists(selected_image_path):
@@ -139,7 +142,9 @@ def create_video_from_scenario(scenario_data_with_audio, product_name, downloade
             if not os.path.exists(placeholder_path_temp):
                  Image.new('RGB', VIDEO_RESOLUTION, color='grey').save(placeholder_path_temp)
             selected_image_path = placeholder_path_temp
-        
+        else:
+            used_image_filenames_in_video.append(os.path.basename(selected_image_path))
+
         print(f"  Scene {scene_num}: 최종 선택 이미지 '{os.path.basename(selected_image_path)}', 길이: {scene_duration:.2f}s")
         
         try:
@@ -148,8 +153,8 @@ def create_video_from_scenario(scenario_data_with_audio, product_name, downloade
 
             resized_pil_image = ImageOps.pad(pil_image, VIDEO_RESOLUTION, method=Image.Resampling.LANCZOS, color=(0,0,0))
             
-            numpy_image = np.array(resized_pil_image) # PIL 이미지를 NumPy 배열로 변환
-            img_clip = ImageClip(numpy_image)        # NumPy 배열을 ImageClip에 전달
+            numpy_image = np.array(resized_pil_image)
+            img_clip = ImageClip(numpy_image)
             img_clip = img_clip.set_duration(scene_duration)
 
         except Exception as e:
@@ -159,8 +164,8 @@ def create_video_from_scenario(scenario_data_with_audio, product_name, downloade
             pil_placeholder = Image.open(placeholder_path_temp).convert("RGB")
             resized_placeholder = ImageOps.pad(pil_placeholder, VIDEO_RESOLUTION, method=Image.Resampling.LANCZOS, color=(0,0,0))
             
-            numpy_placeholder = np.array(resized_placeholder) # PIL 이미지를 NumPy 배열로 변환
-            img_clip = ImageClip(numpy_placeholder).set_duration(scene_duration) # NumPy 배열을 ImageClip에 전달
+            numpy_placeholder = np.array(resized_placeholder)
+            img_clip = ImageClip(numpy_placeholder).set_duration(scene_duration)
 
 
         txt_clip = None
@@ -218,11 +223,26 @@ def create_video_from_scenario(scenario_data_with_audio, product_name, downloade
         print(f"최종 영상 저장 중 오류 발생: {e}")
         return None
     finally:
-        # 리소스 해제 (이전과 동일)
-        if 'final_clip' in locals() and final_clip: final_clip.close()
+        if 'final_clip' in locals() and final_clip: 
+            final_clip.close()
         for sc in scene_clips:
             if sc: 
-                if hasattr(sc, 'close'): sc.close()
+                # MoviePy 클립들은明시적인 close가 필요할 수 있음 (특히 ImageClip, AudioFileClip)
+                if hasattr(sc, 'reader') and hasattr(sc.reader, 'close_proc'): # VideoClip의 경우
+                    sc.reader.close_proc()
+                if hasattr(sc, 'audio') and sc.audio and hasattr(sc.audio, 'close_proc'): # 오디오가 있는 경우
+                     if hasattr(sc.audio, 'reader') and hasattr(sc.audio.reader, 'close_proc'):
+                        sc.audio.reader.close_proc()
+                # 간단하게 모든 클립에 대해 close() 시도 (오류 발생 가능성 있음, MoviePy 버전에 따라 다름)
+                try:
+                    if hasattr(sc, 'close'): sc.close()
+                except:
+                    pass # close 메서드가 없거나 이미 닫힌 경우 무시
+
+        # AudioFileClip 객체들을 별도 리스트로 관리했다면 여기서 close
+        # if audio_clip_moviepy and hasattr(audio_clip_moviepy, 'close'):
+        # audio_clip_moviepy.close() # 마지막 루프의 오디오 클립만 닫히게 됨, 모든 오디오 클립을 관리해야 함
+
         if os.path.exists(placeholder_path_temp):
             try: os.remove(placeholder_path_temp)
             except: pass

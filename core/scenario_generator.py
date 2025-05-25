@@ -5,7 +5,8 @@ import google.generativeai as genai
 from PIL import Image
 
 from config import (GOOGLE_API_KEY_GEMINI, GEMINI_TEXT_MODEL_NAME,
-                    EXTRACTED_TEXTS_FOLDER, GEMINI_VISION_MODEL_NAME)
+                    EXTRACTED_TEXTS_FOLDER, GEMINI_VISION_MODEL_NAME,
+                    TTS_SPEAKING_RATE)
 from utils.file_utils import ensure_folder_exists, save_text_to_file
 
 _gemini_configured_scenario = False
@@ -19,7 +20,6 @@ def _ensure_gemini_configured_scenario():
         _gemini_configured_scenario = True
 
 def generate_initial_narration(product_name, ocr_texts):
-    # (이전과 동일)
     _ensure_gemini_configured_scenario()
     model = genai.GenerativeModel(GEMINI_TEXT_MODEL_NAME)
     print(f"Gemini Text 모델 ({GEMINI_TEXT_MODEL_NAME}) 로드 완료 (for initial narration).")
@@ -28,16 +28,14 @@ def generate_initial_narration(product_name, ocr_texts):
         print("OCR 텍스트가 없어 초기 나레이션 생성을 건너<0xEB><0x9B><0x84>니다.")
         return None
     
-    # OCR 텍스트에서 광고성/불필요 정보 일부 필터링 시도 (정교한 필터링은 어려움)
     filtered_ocr_texts = []
     ignore_keywords = ["배송", "택배", "반품", "교환", "고객센터", "주문내역", "결제", "영업일", "주의사항"]
     for text_block in ocr_texts:
         if not any(keyword in text_block for keyword in ignore_keywords):
-            # 추가적으로, 너무 긴 숫자 시퀀스 (예: 사업자번호, 전화번호 패턴 등)도 제외 고려 가능
-            if not re.search(r'\d{5,}', text_block): # 5자리 이상 연속된 숫자 제외 (간단한 예시)
+            if not re.search(r'\d{5,}', text_block): 
                  filtered_ocr_texts.append(text_block)
     
-    combined_ocr_texts = "\n".join(filtered_ocr_texts if filtered_ocr_texts else ocr_texts) # 필터링된게 없으면 원본 사용
+    combined_ocr_texts = "\n".join(filtered_ocr_texts if filtered_ocr_texts else ocr_texts)
 
     prompt_for_initial_narration = f"""
     당신은 창의적인 쇼츠 영상 광고 카피라이터입니다.
@@ -61,7 +59,6 @@ def generate_initial_narration(product_name, ocr_texts):
     생성할 전체 나레이션 스크립트 (40-50초 분량 목표):
     """
     print("\n=== Gemini API로 초기 전체 나레이션 생성 요청 (40-50초 목표) ===")
-    # (이하 동일)
     try:
         response = model.generate_content(prompt_for_initial_narration)
         initial_narration_script = response.text.strip()
@@ -91,6 +88,7 @@ def generate_scene_by_scene_script(product_name, initial_narration):
     JSON 리스트 형식으로 결과를 만들어주세요.
     **최종 영상의 총 길이는 반드시 40초에서 50초 사이가 되도록 각 씬의 'duration_seconds' 합계를 조절해주세요.**
 
+    **참고: 생성될 음성은 약 {TTS_SPEAKING_RATE}배속으로 재생될 예정입니다. 이 속도를 고려하여 각 씬의 나레이션 분량에 맞는 'duration_seconds'를 할당해주세요.**
     전체 나레이션 스크립트:
     ---
     {initial_narration}
@@ -113,7 +111,6 @@ def generate_scene_by_scene_script(product_name, initial_narration):
     위 형식에 맞춰 씬별 스크립트를 생성해주세요. (총 길이 40-50초 엄수)
     """
     print("\n=== Gemini API로 씬별 JSON 스크립트 생성 요청 (총 40-50초 목표) ===")
-    # (이하 JSON 파싱 로직 동일)
     try:
         response = model.generate_content(prompt_for_scene_script)
         raw_response_text = response.text
@@ -136,7 +133,7 @@ def generate_scene_by_scene_script(product_name, initial_narration):
         
         print(f"--- 생성된 씬별 스크립트 (JSON 파싱 성공) ---")
         print(f"JSON에 명시된 총 예상 길이: {total_duration_from_json} 초")
-        if not (40 <= total_duration_from_json <= 55): # 50초 살짝 넘는 것까진 허용
+        if not (40 <= total_duration_from_json <= 55): 
              print(f"⚠️ 경고: JSON 스크립트의 총 길이가 목표(40-50초)를 벗어났습니다: {total_duration_from_json}초. 프롬프트 조정 또는 후처리 필요 가능성.")
 
         ensure_folder_exists(EXTRACTED_TEXTS_FOLDER)
@@ -151,19 +148,27 @@ def generate_scene_by_scene_script(product_name, initial_narration):
         print(f"씬별 스크립트 생성 중 오류 발생: {e_scene}")
         return None
 
-
-def recommend_image_for_scene(scene_description, scene_narration, scene_subtitle, available_image_paths, product_name="", scene_number="N/A"):
+def recommend_image_for_scene(scene_description, scene_narration, scene_subtitle, 
+                              available_image_paths, product_name="", scene_number="N/A", 
+                              previously_used_filenames=None):
     if not available_image_paths:
         print(f"  [Scene {scene_number} Image Recommender] 사용 가능한 이미지가 없습니다.")
         return None
+    
     if not scene_description and not scene_narration and not scene_subtitle:
-        print(f"  [Scene {scene_number} Image Recommender] 씬 정보(설명, 나레이션, 자막)가 없어 첫 번째 이미지를 사용합니다.")
+        print(f"  [Scene {scene_number} Image Recommender] 씬 정보(설명, 나레이션, 자막)가 없어 첫 번째 사용 가능한 이미지를 사용합니다.")
+        if previously_used_filenames:
+            for img_path in available_image_paths:
+                if os.path.basename(img_path) not in previously_used_filenames:
+                    print(f"    Fallback: 이전에 사용되지 않은 이미지 선택 - {os.path.basename(img_path)}")
+                    return img_path
+        print(f"    Fallback: 사용 가능한 첫 번째 이미지 선택 - {os.path.basename(available_image_paths[0])}")
         return available_image_paths[0]
+
 
     _ensure_gemini_configured_scenario()
     model = genai.GenerativeModel(GEMINI_VISION_MODEL_NAME)
-    print(f"  [Scene {scene_number} Image Recommender] Gemini Vision 모델 ({GEMINI_VISION_MODEL_NAME}) 로드 완료.")
-
+    
     prompt_parts = [
         f"'{product_name}' 상품의 쇼츠 영상의 한 장면(Scene {scene_number})에 사용할 이미지를 추천해야 합니다.\n",
         "이 장면에 대한 정보는 다음과 같습니다:\n"
@@ -176,12 +181,26 @@ def recommend_image_for_scene(scene_description, scene_narration, scene_subtitle
         "1. 이미지 내에 글자가 너무 많거나, 복잡한 표, 상세 스펙 설명 위주의 이미지는 피해주세요.\n",
         "2. 상품 자체의 모습, 사용 예시, 먹음직스러운 음식 사진, 제품의 특징을 잘 보여주는 시각적 이미지를 선호합니다.\n",
         "3. 배송 정보, 반품 정책, 회사 연락처, 고객센터 안내, 결제창 스크린샷 등 광고의 부가 정보 이미지는 선택하지 마세요.\n",
-        "4. 단순히 글자만 많은 이미지보다는, 장면의 내용과 시각적으로 가장 관련성이 높은 이미지를 선택해야 합니다.\n\n",
+        "4. 단순히 글자만 많은 이미지보다는, 장면의 내용과 시각적으로 가장 관련성이 높은 이미지를 선택해야 합니다.\n"
+    ]
+
+    if previously_used_filenames:
+        prompt_parts.append(
+            "5. **패널티 적용**: 다음 이미지들은 이전에 이미 사용되었습니다: [" + ", ".join(previously_used_filenames) + "]. "
+            "가능하면 이 목록에 없는 새로운 이미지를 우선적으로 고려해주세요. "
+            "하지만, 현재 씬의 내용과 정말로 잘 어울리고 다른 대안이 없다면 다시 선택해도 괜찮습니다. "
+            "다양성을 위해 새로운 이미지를 적극적으로 찾아주세요.\n\n"
+        )
+    else:
+        prompt_parts.append("\n")
+
+
+    prompt_parts.extend([
         "다른 부연 설명이나 문장은 절대 추가하지 마세요. 오직 파일명만 응답해야 합니다.\n",
         "만약 어떤 이미지도 위 지침에 따라 적합하지 않다고 판단되면 \"없음\"이라고 정확히 응답해주세요.\n\n",
         "--- 사용 가능한 이미지 목록 시작 ---"
-    ]
-    # (이하 이미지 로드 및 프롬프트 구성, API 호출 로직은 이전과 유사하게 유지)
+    ])
+    
     loaded_images_info = []
     for img_path in available_image_paths:
         try:
@@ -194,6 +213,11 @@ def recommend_image_for_scene(scene_description, scene_narration, scene_subtitle
     
     if not loaded_images_info:
         print(f"  [Scene {scene_number} Image Recommender] 로드 가능한 이미지가 없습니다.")
+        # Fallback 로직 강화
+        if previously_used_filenames:
+            for img_path_fallback in available_image_paths: # available_image_paths는 경로 리스트
+                if os.path.basename(img_path_fallback) not in previously_used_filenames:
+                    return img_path_fallback
         return available_image_paths[0] if available_image_paths else None
 
     MAX_IMAGES_PER_REQUEST = 10 
@@ -205,20 +229,23 @@ def recommend_image_for_scene(scene_description, scene_narration, scene_subtitle
     
     prompt_parts.append("\n--- 사용 가능한 이미지 목록 끝 ---")
     prompt_parts.append("\n\n가장 적합한 이미지의 파일명 (위 지침을 반드시 따르세요): ")
-
-    print(f"  [Scene {scene_number} Image Recommender] Gemini Vision API로 이미지 추천 요청 중 ({len(current_images_to_send_info)}개 이미지 분석)...")
     
     try:
         generation_config = genai.types.GenerationConfig(
-            temperature=0.2 # 좀 더 결정적인 답변 유도
+            temperature=0.3 
         )
         response = model.generate_content(prompt_parts, generation_config=generation_config)
         
         recommended_filename_raw = response.text.strip()
-        print(f"  [Scene {scene_number} Image Recommender] Gemini 응답: '{recommended_filename_raw}'")
 
         if recommended_filename_raw == "없음":
-            print(f"  [Scene {scene_number} Image Recommender] Gemini가 적합한 이미지를 찾지 못했습니다 (응답: '없음').")
+            print(f"  [Scene {scene_number} Image Recommender] Gemini가 적합한 이미지를 찾지 못했습니다 (응답: '없음'). Fallback 사용.")
+            if previously_used_filenames:
+                for img_path in available_image_paths:
+                    if os.path.basename(img_path) not in previously_used_filenames:
+                        print(f"    Fallback: 이전에 사용되지 않은 이미지 선택 - {os.path.basename(img_path)}")
+                        return img_path
+            print(f"    Fallback: 사용 가능한 첫 번째 이미지 선택 - {os.path.basename(available_image_paths[0]) if available_image_paths else '없음'}")
             return available_image_paths[0] if available_image_paths else None
         
         found_image_path = None
@@ -228,15 +255,25 @@ def recommend_image_for_scene(scene_description, scene_narration, scene_subtitle
                 break
         
         if found_image_path:
-            print(f"  [Scene {scene_number} Image Recommender] Gemini 추천 이미지: {os.path.basename(found_image_path)}")
             return found_image_path
         else:
             print(f"  ⚠️ [Scene {scene_number} Image Recommender] Gemini가 추천한 파일명 '{recommended_filename_raw}'이(가) 사용 가능한 이미지 목록에 없습니다. Fallback 사용.")
+            if previously_used_filenames:
+                for img_path in available_image_paths:
+                    if os.path.basename(img_path) not in previously_used_filenames:
+                        print(f"    Fallback: 이전에 사용되지 않은 이미지 선택 - {os.path.basename(img_path)}")
+                        return img_path
+            print(f"    Fallback: 사용 가능한 첫 번째 이미지 선택 - {os.path.basename(available_image_paths[0]) if available_image_paths else '없음'}")
             return available_image_paths[0] if available_image_paths else None
 
     except Exception as e:
         print(f"  🛑 [Scene {scene_number} Image Recommender] 이미지 추천 중 오류 발생: {e}")
-        # 프롬프트에서 이미지 객체 제외하고 출력 (디버깅용)
         text_prompt_for_debug = [str(p) for p in prompt_parts if not isinstance(p, Image.Image)]
         print(f"     Gemini 요청 프롬프트 일부 (이미지 제외): {' '.join(text_prompt_for_debug)[:500]}")
+        if previously_used_filenames:
+            for img_path in available_image_paths:
+                if os.path.basename(img_path) not in previously_used_filenames:
+                    print(f"    Fallback (오류 발생): 이전에 사용되지 않은 이미지 선택 - {os.path.basename(img_path)}")
+                    return img_path
+        print(f"    Fallback (오류 발생): 사용 가능한 첫 번째 이미지 선택 - {os.path.basename(available_image_paths[0]) if available_image_paths else '없음'}")
         return available_image_paths[0] if available_image_paths else None
