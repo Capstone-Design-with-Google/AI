@@ -1,0 +1,46 @@
+// .devcontainer/devcontainer.json
+{
+    "name": "AI Shorts Generator (Python 3.11.9)",
+    "build": {
+        "dockerfile": "Dockerfile", // 바로 아래에서 만들 Dockerfile 사용
+        "context": ".." // Dockerfile의 빌드 컨텍스트를 프로젝트 루트(shoppable_ai)로 설정
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-toolsai.jupyter", // Jupyter 노트북 사용 시
+                "bierner.github-markdown-preview" // Markdown 미리보기 향상 (선택)
+            ]
+        },
+        // (선택 사항) VS Code 설정 (Codespace에 적용)
+        "settings": {
+            "python.defaultInterpreterPath": "/usr/local/bin/python", // Dockerfile에서 설치한 Python 경로
+            "python.linting.pylintEnabled": true,
+            "python.linting.enabled": true,
+            "editor.formatOnSave": true, // 저장 시 자동 포맷 (black, autopep8 등 포맷터 설치 필요)
+            "python.formatting.provider": "autopep8" // 예시, black도 좋음
+        }
+    },
+    // Codespace 생성 후 자동으로 실행할 명령어
+    // config.py를 실행하여 폴더를 만들고, .env 파일이 존재함을 가정하고 로드 시도
+    "postCreateCommand": "mkdir -p credentials && echo \"${env:GCP_CREDENTIALS_CONTENT_ENV_VAR}\" > credentials/service_account.json && export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/credentials/service_account.json && python3 config.py && echo 'Codespace 준비 완료! main.py를 실행하세요.'",
+
+    // 포트 포워딩 (만약 로컬에서 API 서버 등을 실행한다면 필요에 따라 추가)
+    // "forwardPorts": [8000],
+
+    // 환경 변수 설정 (중요!)
+    // GitHub Secrets를 사용하는 것을 강력히 권장합니다.
+    // 레포지토리 Settings > Secrets and variables > Codespaces 에서 아래 이름으로 Secret을 만드세요.
+    "containerEnv": {
+        // .env 파일 내용을 Codespace 환경 변수로 직접 주입 (선호되는 방식)
+        "GOOGLE_API_KEY_GEMINI_SECRET": "${codespaceSecret:GOOGLE_API_KEY_GEMINI_SECRET}", // Secret 이름은 다르게 해도 됨
+        // GCP 서비스 계정 키 파일 내용을 Secret으로 주입
+        "GCP_SERVICE_ACCOUNT_KEY_JSON_CONTENT": "${codespaceSecret:GCP_CREDENTIALS_SECRET}" // Secret 이름은 다르게 해도 됨
+    },
+    // "postCreateCommand": "mkdir -p credentials && echo \"${env:GCP_CREDENTIALS_CONTENT_ENV_VAR}\" > credentials/service_account.json && export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/credentials/service_account.json && python3 config.py && echo 'Codespace 준비 완료! main.py를 실행하세요.'",
+
+    // (선택 사항) 컨테이너 실행 시 추가 옵션
+    "runArgs": ["--ulimit", "nofile=1024:524288"] // MoviePy 등에서 파일 핸들 관련 이슈 방지
+}

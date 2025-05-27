@@ -4,7 +4,7 @@ selenium
 Pillow
 google-generativeai
 google-cloud-texttospeech
-moviepy
+moviepy==1.0.3
 python-dotenv
 numpy
 # webdriver-manager

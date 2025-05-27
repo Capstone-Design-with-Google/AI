@@ -23,6 +23,7 @@ GEMINI_TEXT_MODEL_NAME = 'gemini-1.5-flash'   # 나레이션 및 씬 스크립�
 
 TTS_LANGUAGE_CODE = "ko-KR"
 TTS_VOICE_NAME_NEURAL = "ko-KR-Neural2-B"
+# TTS_VOICE_NAME_NEURAL = "ko-KR-Chirp3-HD-Puck"
 TTS_SPEAKING_RATE = 1.5  # 기본값 1.0, 1.0보다 크면 빨라짐 (예: 1.2는 20% 빠르게)
 
 VIDEO_FPS = 24
