@@ -52,12 +52,15 @@ RUN LATEST_CHROMEDRIVER_VERSION=$(curl -sS https://googlechromelabs.github.io/ch
 
 # 다시 vscode 사용자로 전환
 USER vscode
+COPY requirements.txt /tmp/requirements.txt
 
 # Python 라이브러리 설치 (프로젝트 루트의 requirements.txt 사용)
 # Dockerfile 빌드 시점에 requirements.txt가 컨테이너로 복사됨 (devcontainer.json의 context 설정 덕분)
 # COPY requirements.txt /tmp/pip-tmp/ # 이 줄은 context가 ".."이면 필요 없을 수 있음
+# RUN pip3 install --upgrade pip \
+#    && pip3 --disable-pip-version-check --no-cache-dir install -r requirements.txt
 RUN pip3 install --upgrade pip \
-    && pip3 --disable-pip-version-check --no-cache-dir install -r requirements.txt
+    && pip3 --disable-pip-version-check --no-cache-dir install -r /tmp/requirements.txt
 
 # (선택 사항) WebDriver Manager 설치 (Dockerfile에서 미리 설치하면 실행 시점 속도 향상)
 RUN pip3 install webdriver-manager
